@@ -30,55 +30,41 @@ const Login = () => {
             return;
         }
 
-        // Simulate API call
-        setTimeout(() => {
-            localStorage.setItem('userName', formData.name);
-            localStorage.setItem('isLoggedIn', 'true');
-            setIsLoading(false);
-            navigate('/');
-        }, 1000);
+        localStorage.setItem('userName', formData.name);
+        localStorage.setItem('isLoggedIn', 'true');
+        setIsLoading(false);
+        navigate('/');
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100 py-12 px-4 sm:px-6 lg:px-8">
             <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-                className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-lg border border-emerald-50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="max-w-md w-full space-y-8 login-container p-8"
             >
-                <div className="text-center">
-                    <div className="mx-auto h-20 w-20 flex items-center justify-center mb-4">
-                        <motion.span 
-                            className="text-5xl"
-                            animate={{
-                                rotate: [0, 5, -5, 0],
-                                y: [0, -3, 3, 0]
-                            }}
-                            transition={{
-                                duration: 6,
-                                repeat: Infinity,
-                                ease: "easeInOut"
-                            }}
-                        >
-                            🌿
-                        </motion.span>
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-emerald-600 to-teal-400 bg-clip-text text-transparent">
+                <div>
+                    <motion.div 
+                        className="mx-auto h-16 w-16 text-4xl flex items-center justify-center"
+                        whileHover={{ rotate: 20, scale: 1.1 }}
+                        transition={{ duration: 0.3 }}
+                    >
+                        <span className="brand-icon">🌴</span>
+                    </motion.div>
+                    <h2 className="mt-6 text-center login-title">
                         Welcome to CATTANI
                     </h2>
-                    
-                    <p className="text-gray-500 font-medium">
-                        Sign in to your account
+                    <p className="mt-2 text-center text-gray-600">
+                        Please sign in to continue
                     </p>
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <div className="space-y-5">
+                    <div className="space-y-4">
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                                Username
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                                Name
                             </label>
                             <input
                                 id="name"
@@ -87,12 +73,12 @@ const Login = () => {
                                 required
                                 value={formData.name}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
-                                placeholder="Enter your username"
+                                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm mt-1"
+                                placeholder="Enter your name"
                             />
                         </div>
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                                 Password
                             </label>
                             <input
@@ -102,7 +88,7 @@ const Login = () => {
                                 required
                                 value={formData.password}
                                 onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
+                                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 focus:z-10 sm:text-sm mt-1"
                                 placeholder="Enter your password"
                             />
                         </div>
@@ -112,7 +98,7 @@ const Login = () => {
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="text-red-500 text-sm text-center p-2 bg-red-50 rounded-lg"
+                            className="text-red-500 text-sm text-center"
                         >
                             {error}
                         </motion.div>
@@ -120,29 +106,20 @@ const Login = () => {
 
                     <div>
                         <motion.button
-                            whileHover={{ 
-                                backgroundColor: '#059669' // darker emerald
-                            }}
-                            whileTap={{ scale: 0.99 }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3 px-4 bg-emerald-500 text-white font-medium rounded-xl transition-colors duration-200 flex justify-center items-center"
+                            className="custom-button w-full flex justify-center"
                         >
                             {isLoading ? (
-                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
-                                'Sign In'
+                                'Sign in'
                             )}
                         </motion.button>
                     </div>
                 </form>
-
-                <div className="text-center text-sm text-gray-500 mt-4">
-                    Don't have an account?{' '}
-                    <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500">
-                        Sign up
-                    </a>
-                </div>
             </motion.div>
         </div>
     );
