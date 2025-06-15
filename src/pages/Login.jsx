@@ -42,139 +42,107 @@ const Login = () => {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 py-12 px-4 sm:px-6 lg:px-8">
             <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl shadow-emerald-100/50 border border-emerald-50"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-lg border border-emerald-50"
             >
                 <div className="text-center">
-                    <motion.div 
-                        className="mx-auto h-20 w-20 flex items-center justify-center mb-4"
-                        animate={{
-                            rotate: [0, 10, -10, 0],
-                            y: [0, -5, 5, 0]
-                        }}
-                        transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                        }}
-                    >
-                        <span className="text-5xl">🌿</span>
-                    </motion.div>
+                    <div className="mx-auto h-20 w-20 flex items-center justify-center mb-4">
+                        <motion.span 
+                            className="text-5xl"
+                            animate={{
+                                rotate: [0, 5, -5, 0],
+                                y: [0, -3, 3, 0]
+                            }}
+                            transition={{
+                                duration: 6,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                        >
+                            🌿
+                        </motion.span>
+                    </div>
                     
-                    <motion.h2 
-                        className="text-4xl font-bold mb-2 bg-gradient-to-r from-emerald-600 to-teal-400 bg-clip-text text-transparent"
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2, duration: 0.5 }}
-                    >
+                    <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-emerald-600 to-teal-400 bg-clip-text text-transparent">
                         Welcome to CATTANI
-                    </motion.h2>
+                    </h2>
                     
-                    <motion.p 
-                        className="text-gray-500 font-medium"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.4, duration: 0.5 }}
-                    >
+                    <p className="text-gray-500 font-medium">
                         Sign in to your account
-                    </motion.p>
+                    </p>
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-                    <motion.div 
-                        className="space-y-5"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.6 }}
-                    >
+                    <div className="space-y-5">
                         <div>
                             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                                 Username
                             </label>
-                            <motion.div whileHover={{ scale: 1.01 }}>
-                                <input
-                                    id="name"
-                                    name="name"
-                                    type="text"
-                                    required
-                                    value={formData.name}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
-                                    placeholder="Enter your username"
-                                />
-                            </motion.div>
+                            <input
+                                id="name"
+                                name="name"
+                                type="text"
+                                required
+                                value={formData.name}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
+                                placeholder="Enter your username"
+                            />
                         </div>
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                                 Password
                             </label>
-                            <motion.div whileHover={{ scale: 1.01 }}>
-                                <input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    required
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
-                                    placeholder="Enter your password"
-                                />
-                            </motion.div>
+                            <input
+                                id="password"
+                                name="password"
+                                type="password"
+                                required
+                                value={formData.password}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 outline-none"
+                                placeholder="Enter your password"
+                            />
                         </div>
-                    </motion.div>
+                    </div>
 
                     {error && (
                         <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0 }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
                             className="text-red-500 text-sm text-center p-2 bg-red-50 rounded-lg"
                         >
                             {error}
                         </motion.div>
                     )}
 
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.8 }}
-                    >
+                    <div>
                         <motion.button
                             whileHover={{ 
-                                scale: 1.02,
-                                boxShadow: "0 4px 20px rgba(16, 185, 129, 0.3)"
+                                backgroundColor: '#059669' // darker emerald
                             }}
-                            whileTap={{ scale: 0.98 }}
+                            whileTap={{ scale: 0.99 }}
                             type="submit"
                             disabled={isLoading}
-                            className="w-full py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex justify-center items-center"
+                            className="w-full py-3 px-4 bg-emerald-500 text-white font-medium rounded-xl transition-colors duration-200 flex justify-center items-center"
                         >
                             {isLoading ? (
-                                <motion.div
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                                />
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
-                                <span>Sign In</span>
+                                'Sign In'
                             )}
                         </motion.button>
-                    </motion.div>
+                    </div>
                 </form>
 
-                <motion.div 
-                    className="text-center text-sm text-gray-500 mt-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 1 }}
-                >
+                <div className="text-center text-sm text-gray-500 mt-4">
                     Don't have an account?{' '}
                     <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500">
                         Sign up
                     </a>
-                </motion.div>
+                </div>
             </motion.div>
         </div>
     );
