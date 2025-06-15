@@ -1,0 +1,37 @@
+/* Bottom Navigation Styles */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottom-nav-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.bottom-nav-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #059669, #34d399);
+  transition: all 0.3s ease;
+  transform: translateX(-50%);
+}
+
+.bottom-nav-item.active::after {
+  width: 20px;
+}
+
+.bottom-nav-icon {
+  transition: all 0.3s ease;
+}
+
+.bottom-nav-item:hover .bottom-nav-icon {
+  transform: translateY(-2px);
+}
+
+.nav-indicator {
+  background: linear-gradient(90deg, #059669, #34d399);
+}
