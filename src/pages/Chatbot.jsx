@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
-  FiClock, FiCpu, FiSettings, FiStopCircle, FiMessageSquare,
+  FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
   FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe,
   FiExternalLink, FiCheck, FiInfo, FiStar, FiAlertTriangle
 } from 'react-icons/fi';
@@ -54,8 +54,8 @@ const extractTextFromPDF = async (file) => {
 const performWebSearch = async (query) => {
   try {
     // First try DuckDuckGo
-  const ddgResponse = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
-  const ddgData = await ddgResponse.json();
+    const ddgResponse = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
+    const ddgData = await ddgResponse.json();
     
     let results = ddgData.RelatedTopics
       .filter(topic => topic.FirstURL && topic.Text)
@@ -65,13 +65,12 @@ const performWebSearch = async (query) => {
         snippet: topic.Text.replace(/<[^>]*>?/gm, ''),
         source: 'DuckDuckGo'
       }));
-      
     
     // If no results, try Wikipedia API
     if (results.length < 3) {
       try {
-  const wikiResponse = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
-  const wikiData = await wikiResponse.json();
+        const wikiResponse = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
+        const wikiData = await wikiResponse.json();
         
         const wikiResults = wikiData.query?.search?.slice(0, 3).map(item => ({
           title: item.title,
@@ -96,8 +95,8 @@ const performWebSearch = async (query) => {
 const scrapeWebsiteContent = async (url) => {
   try {
     // In production, use a backend service for scraping
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  const response = await fetch(proxyUrl);
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
     const data = await response.json();
     
     if (data.contents) {
@@ -129,9 +128,13 @@ const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
+  const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [memories, setMemories] = useState([]);
+  const [isProMode, setIsProMode] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
@@ -142,9 +145,8 @@ const ChatBot = () => {
   const [searchMode, setSearchMode] = useState(false); // 'none', 'shallow', 'deep'
   const [searchResults, setSearchResults] = useState([]);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
-  
-  const [showAd, setShowAd] = useState(true);
-  const [adTimer, setAdTimer] = useState(0);
+  const [memoryImportanceFilter, setMemoryImportanceFilter] = useState('all'); // 'all', 'important', 'normal'
+  const [showMemoryDetails, setShowMemoryDetails] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -155,67 +157,26 @@ const ChatBot = () => {
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  // Load AdSense script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6822768824603153";
-    script.crossOrigin = "anonymous";
-    document.head.appendChild(script);
-
-    return () => {
-      document.head.removeChild(script);
-    };
-  }, []);
-
-  // Show ad after 10 minutes of usage
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setAdTimer(prev => {
-        if (prev >= 600) { // 10 minutes
-          setShowAd(true);
-          return 0;
-        }
-        return prev + 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Memory feature removed for efficiency (no-op placeholders kept minimal)
-
-  // Enter fullscreen mode when component mounts
-  useEffect(() => {
-    const enterFullscreen = () => {
+  // Enhanced memory system with Indonesian language support
+  const loadMemories = useCallback(() => {
+    const savedMemories = localStorage.getItem('orionMemories');
+    if (savedMemories) {
       try {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(err => {
-            console.log(`Error attempting to enable fullscreen: ${err.message}`);
-          });
-        }
-      } catch (error) {
-        console.error("Fullscreen error:", error);
+        const parsed = JSON.parse(savedMemories);
+        setMemories(parsed);
+      } catch (e) {
+        console.error("Error loading memories:", e);
       }
-    };
-
-    // Add animation class to body for smooth transitions
-    document.body.classList.add('smooth-transitions');
-    
-    // Enter fullscreen with a slight delay to allow DOM to load
-    const fullscreenTimer = setTimeout(enterFullscreen, 300);
-    
-    // Cleanup
-    return () => {
-      clearTimeout(fullscreenTimer);
-      document.body.classList.remove('smooth-transitions');
-    };
+    }
   }, []);
 
   // Load all data from localStorage
   useEffect(() => {
+    loadMemories();
+    
     const savedChatRooms = localStorage.getItem('orionChatRooms');
     const savedCurrentRoom = localStorage.getItem('orionCurrentRoom');
+    const savedProMode = localStorage.getItem('orionProMode');
     const savedDarkMode = localStorage.getItem('orionDarkMode');
     
     if (savedChatRooms) setChatRooms(JSON.parse(savedChatRooms));
@@ -227,13 +188,14 @@ const ChatBot = () => {
         setChatHistory(room.history || []);
       }
     }
+    if (savedProMode) setIsProMode(savedProMode === 'true');
     if (savedDarkMode) setDarkMode(savedDarkMode === 'true');
     
     // Create initial room if none exists
     if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0)) {
       createNewChatRoom();
     }
-  }, []);
+  }, [loadMemories]);
 
   // Save current room when messages change
   useEffect(() => {
@@ -299,7 +261,7 @@ const ChatBot = () => {
   const createNewChatRoom = () => {
     const newRoom = {
       id: Date.now().toString(),
-  name: `Percakapan ${new Date().toLocaleTimeString()}`,
+      name: `Percakapan ${new Date().toLocaleTimeString()}`,
       messages: [],
       history: [],
       createdAt: new Date().toISOString(),
@@ -312,7 +274,7 @@ const ChatBot = () => {
     setChatHistory([]);
     setPendingFiles([]);
     setInputMessage('');
-  // template buttons removed
+    setShowTemplateButtons(true);
     messageCountRef.current = 0;
     setSearchMode(false);
     setSearchResults([]);
@@ -327,7 +289,7 @@ const ChatBot = () => {
       setCurrentRoomId(roomId);
       setMessages(room.messages || []);
       setChatHistory(room.history || []);
-  // template buttons removed
+      setShowTemplateButtons(room.messages.length === 0);
       setShowChatHistory(false);
       setAutoScroll(true);
       setSearchMode(false);
@@ -358,7 +320,7 @@ const ChatBot = () => {
     duration,
     file,
     sources,
-    isCode: text.includes('') // Flag for code blocks
+    isCode: text.includes('```') // Flag for code blocks
   });
 
   const extractTextFromFile = async (file) => {
@@ -379,9 +341,127 @@ const ChatBot = () => {
     return `File content not extractable: ${file.name}`;
   };
 
-  // Memory/pro features removed: no background summarization or memory lookup
+  // Enhanced Indonesian-aware summarization
+  const summarizeConversation = async (conversation) => {
+    try {
+      const prompt = `Buat ringkasan sangat singkat (maksimal 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. Hilangkan semua salam dan basa-basi. Berikan juga tingkat kepentingan (1-5, 5 paling penting) berdasarkan:\n
+      1. Apakah mengandung informasi penting jangka panjang?\n
+      2. Apakah ada keputusan atau kesepakatan?\n
+      3. Apakah ada data atau fakta penting?\n
+      4. Apakah ada preferensi atau kebiasaan pengguna?\n
+      Format output: [RINGKASAN] | [TINGKAT_KEPENTINGAN]\n\nPercakapan:\n${conversation}`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
+      return response.trim() || "Tidak bisa membuat ringkasan | 1";
+    } catch (error) {
+      console.error("Error summarizing conversation:", error);
+      return "Tidak bisa membuat ringkasan | 1";
+    }
+  };
+
+  // Enhanced memory finding with semantic search (Indonesian support)
+  const findRelevantMemories = async (query) => {
+    if (memories.length === 0) return '';
+    
+    try {
+      // First try to find exact matches in recent memories
+      const recentMemories = memories
+        .slice(0, 20) // Last 20 memories
+        .filter(mem => 
+          mem.summary.toLowerCase().includes(query.toLowerCase()) || 
+          mem.messages.some(msg => msg.text.toLowerCase().includes(query.toLowerCase()))
+        );
+      
+      if (recentMemories.length > 0) {
+        return recentMemories
+          .map(mem => `[Memori ${mem.context.date} - Penting: ${mem.context.importance}/5]: ${mem.summary}\nDetail: ${
+            mem.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
+          }`)
+          .join('\n\n');
+      }
+      
+      // If no exact matches, use AI to find semantically similar memories
+      const memoryTexts = memories
+        .slice(0, 50) // Limit to 50 memories for performance
+        .map(m => `ID: ${m.id}\nSummary: ${m.summary}\nTags: ${m.context.tags.join(', ')}\nImportance: ${m.context.importance}`)
+        .join('\n\n');
+      
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi ID memori yang paling relevan (berdasarkan makna, bukan kata kunci) untuk pertanyaan dalam bahasa Indonesia. Berikan hanya ID yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
+      const relevantIds = response.trim().split(',').map(id => id.trim()).filter(Boolean);
+      
+      return memories
+        .filter(m => relevantIds.includes(m.id))
+        .map(m => `[Memori ${m.context.date} - Penting: ${m.context.importance}/5]: ${m.summary}\nDetail: ${
+          m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
+        }`)
+        .join('\n\n');
+    } catch (error) {
+      console.error("Error finding relevant memories:", error);
+      return '';
+    }
+  };
+
+  // Enhanced auto-save with context (Indonesian support)
+  const autoSaveToMemory = useCallback(async () => {
+    if (messages.length === 0 || messageCountRef.current % 3 !== 0) return;
+    
+    try {
+      setIsBotTyping(true);
+      const conversationText = messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`).join('\n');
+      const summaryWithImportance = await summarizeConversation(conversationText);
+      
+      const [summary, importanceStr] = summaryWithImportance.split('|').map(s => s.trim());
+      const importance = parseInt(importanceStr) || 1;
+      
+      if (summary && !summary.includes("tidak bisa")) {
+        // Generate tags in Indonesian for better memory organization
+        const tagPrompt = `Beri 2-3 tag pendek dalam Bahasa Indonesia untuk ringkasan ini:\n"${summary}"\n\nTags harus berupa kata benda yang relevan dan dipisahkan koma.`;
+        const tagResult = await model.generateContent(tagPrompt);
+        const tags = (await tagResult.response.text())
+          .split(',')
+          .map(t => t.trim().toLowerCase())
+          .filter(t => t.length > 0);
+        
+        const newMemory = {
+          id: Date.now().toString(),
+          summary,
+          messages: [...messages],
+          context: {
+            date: new Date().toLocaleString('id-ID'),
+            roomId: currentRoomId,
+            tags,
+            importance,
+            language: 'indonesia' // Track language of memory
+          },
+          embeddings: [] // Would be filled with vector embeddings in a real app
+        };
+        
+        const updatedMemories = [newMemory, ...memories];
+        setMemories(updatedMemories);
+        localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
+        
+        // Show memory saved notification
+        controls.start({
+          scale: [1, 1.1, 1],
+          transition: { duration: 0.3 }
+        });
+      }
+    } catch (error) {
+      console.error("Error saving to memory:", error);
+    } finally {
+      setIsBotTyping(false);
+    }
+  }, [messages, memories, currentRoomId, controls]);
 
   const typeMessage = async (fullText, callback) => {
+    if (isProMode) {
+      callback(fullText);
+      return;
+    }
     
     // Split text into chunks for smoother animation
     const characters = fullText.split('');
@@ -413,7 +493,53 @@ const ChatBot = () => {
     callback(fullText);
   };
 
-
+  const enhanceWithProMode = async (initialResponse, prompt) => {
+    const enhancementPrompts = [
+      `Expand this response significantly with extreme detailed examples and explanations:\n\n${initialResponse}`,
+      `Add comprehensive technical details, use cases, and potential variations to:\n\n${initialResponse}`,
+      `Provide multiple perspectives, edge cases, and practical applications and add Very lot of data in internet for:\n\n${initialResponse}`,
+      `Create an extremely detailed final version incorporating all previous enhancements and add more data for super extremly detail and perfect for:\n\n${initialResponse}`
+    ];
+    
+    let enhancedResponse = initialResponse;
+    
+    for (let i = 0; i < enhancementPrompts.length; i++) {
+      if (abortController?.signal.aborted) break;
+      
+      // Show processing animation
+      setProcessingSources(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: `Processing enhancement ${i + 1}/4`,
+          icon: <FiDatabase />,
+          completed: false,
+          animation: 'wave'
+        }
+      ]);
+      
+      try {
+        const result = await model.generateContent(enhancementPrompts[i]);
+        const response = await result.response.text();
+        enhancedResponse = response;
+      } catch (error) {
+        console.error(`Error in enhancement step ${i + 1}:`, error);
+      }
+      
+      // Update progress in UI
+      setProcessingSources(prev => 
+        prev.map((source, idx) => 
+          idx === i 
+            ? { ...source, completed: true, text: `Completed enhancement ${i + 1}/4` } 
+            : source
+        )
+      );
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    return enhancedResponse;
+  };
 
   const currentMessageId = useRef(null);
 
@@ -544,8 +670,9 @@ const ChatBot = () => {
       }
 
       setInputMessage('');
-    setPendingFiles([]);
-    setIsBotTyping(true);
+      setPendingFiles([]);
+      setIsBotTyping(true);
+      setShowTemplateButtons(false);
       messageCountRef.current += 1;
       setProcessingSources([]);
 
@@ -559,7 +686,7 @@ const ChatBot = () => {
       
       setMessages(prev => [...prev, {
         id: messageId,
-        text: '',
+        text: isProMode ? 'Memproses dengan Pro Mode (mungkin butuh waktu sebentar)...' : '',
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: 0,
@@ -567,9 +694,21 @@ const ChatBot = () => {
         sources: []
       }]);
 
+      // Show processing animation for Pro Mode
+      if (isProMode) {
+        setProcessingSources([
+          { id: '1', text: 'Menganalisis pertanyaan', icon: <FiSearch />, completed: false, animation: 'pulse' },
+          { id: '2', text: 'Mencari memori', icon: <FiDatabase />, completed: false, animation: 'wave' },
+          { id: '3', text: 'Membuat respon', icon: <FiCpu />, completed: false, animation: 'pulse' },
+          { id: '4', text: 'Pengecekan kualitas', icon: <FiAward />, completed: false, animation: 'wave' }
+        ]);
+      }
+
       const startTime = Date.now();
 
-  // (Memory lookup removed) No additional memory or pro-mode requests; single model call below
+      // Find relevant memories using AI (now includes context from all rooms)
+      const relevantMemories = await findRelevantMemories(trimmedMessage);
+      
       // Combine chat history into prompt
       const contextMessages = updatedHistory.slice(-15).map(msg => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
@@ -595,11 +734,39 @@ const ChatBot = () => {
         };
       }
 
-      const fullPrompt = `${webResearchContent.summary ? `Hasil Penelusuran Web:\n${webResearchContent.summary}\n\n` : ''}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. Incorporate web research naturally if available. For coding, provide complete solutions with proper formatting. Always maintain context.`;
+      const fullPrompt = `${
+        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }${
+        webResearchContent.summary ? `Hasil Penelusuran Web:\n${webResearchContent.summary}\n\n` : ''
+      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond as Orion in natural language and follow user language remember that!,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the very detail in internet you must be able to answer Don't let users run away from the page, they must be served well. Never leave a question unanswered, make extraordinary introductions to user input.
 
-      const result = await model.generateContent(fullPrompt);
-      const botResponse = await result.response.text();
+and extremely friendly and very human little bit emoticon and get straight to the point but see the situation don't too to the point, support all users idea if the idea not dangerous, giving extremely and extra respect very respect to user.S,
+      focuse to user comfort and giving detail answer. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
+      just incorporate relevant context naturally, dont show memory log in converstation just follow the converstation to the pointly and you can use memory log for extra understanding user,
+      it all is back process dont show in chat, 
+      ingat!!!! sistem converstation log bersifat rahasia jangan keluarkan/bacakan kalo tidak diminta, if using Indonesian language prefer use allhamdulillah astaghfirullah ya Allah innailaihi and the other when shocked or very happy like Indonesan native speaker it just for Indonesian response and don't too often. answer to the point! keep it short but considering the condition answer just for user promt dont show any converstation log ${
+       
+        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
+      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
+        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
+      }${
+        webResearchContent.summary ? '\n\nNote: Incorporate web research results naturally into your response.' : ''
+      }`;
 
+      let botResponse;
+      if (isProMode) {
+        // Get initial response
+        const initialResult = await model.generateContent(fullPrompt);
+        const initialResponse = await initialResult.response.text();
+        
+        // Enhance with Pro Mode processing
+        botResponse = await enhanceWithProMode(initialResponse, fullPrompt);
+      } else {
+        const result = await model.generateContent(fullPrompt);
+        botResponse = await result.response.text();
+      }
+      
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
@@ -607,26 +774,31 @@ const ChatBot = () => {
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
           ? { 
-              ...msg,
+              ...msg, 
               text: processedResponse, 
               duration,
               sources: webResearchContent.sources,
-              isCode: processedResponse.includes('')
+              isCode: processedResponse.includes('```')
             } 
           : msg
       ));
 
-      // Type out the message with animation
-      await typeMessage(processedResponse, (typedText) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: typedText } : msg
-        ));
-      });
+      // Type out the message with animation (only in normal mode)
+      if (!isProMode) {
+        await typeMessage(processedResponse, (typedText) => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId ? { ...msg, text: typedText } : msg
+          ));
+        });
+      }
 
-  // Add bot response to chat history
+      // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
+
+      // Auto-save to memory every 3 messages
+      await autoSaveToMemory();
 
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
@@ -650,7 +822,7 @@ const ChatBot = () => {
 
   const processSpecialChars = (text) => {
     // Process code blocks first
-    const codeBlockRegex = /(\w+)?\n([\s\S]*?)\n/g;
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const withCodeBlocks = text.replace(codeBlockRegex, (match, language, code) => {
       const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `<div class="code-container">
@@ -664,12 +836,13 @@ const ChatBot = () => {
       </div>`;
     });
 
-    // Process other markdown (safe, simple replacements)
+    // Process other markdown
     return withCodeBlocks
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // bold **text**
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // italic *text*
-      .replace(/~~(.*?)~~/g, '<s>$1</s>') // strike ~~text~~
-      .replace(/`([^`]+)`/g, '<code>$1</code>') // inline `code`
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/_(.*?)_/g, '<u>$1</u>')
+      .replace(/~~(.*?)~~/g, '<s>$1</s>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br />');
   };
 
@@ -690,9 +863,17 @@ const ChatBot = () => {
     }
   };
 
-  // Memory helpers removed
+  const deleteMemory = (id) => {
+    const updatedMemories = memories.filter(memory => memory.id !== id);
+    setMemories(updatedMemories);
+    localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
+  };
 
-  // Pro Mode removed
+  const toggleProMode = () => {
+    const newProMode = !isProMode;
+    setIsProMode(newProMode);
+    localStorage.setItem('orionProMode', newProMode.toString());
+  };
 
   const toggleSearchMode = () => {
     setSearchMode(prev => {
@@ -702,7 +883,11 @@ const ChatBot = () => {
     });
   };
 
-  // Memories removed
+  const filteredMemories = memories.filter(memory => {
+    if (memoryImportanceFilter === 'all') return true;
+    if (memoryImportanceFilter === 'important') return memory.context.importance >= 4;
+    return memory.context.importance < 4;
+  });
 
   // Initialize Prism for syntax highlighting
   useEffect(() => {
@@ -763,50 +948,21 @@ const ChatBot = () => {
 
   return (
     <div className={`flex flex-col h-screen ${themeClasses.bgPrimary} ${themeClasses.textPrimary} relative overflow-hidden transition-colors duration-300`}>
-      {/* Ad Banner (Top) */}
-      {showAd && (
-        <motion.div 
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -50 }}
-          transition={{ duration: 0.3 }}
-          className={`w-full ${themeClasses.bgSecondary} ${themeClasses.border} p-2 flex justify-center items-center sticky top-0 z-50`}
-        >
-          <div className="text-center text-xs">
-            <p className="mb-1">Dukung kami dengan menonaktifkan AdBlock</p>
-            <div className="w-full max-w-2xl mx-auto">
-              <ins className="adsbygoogle"
-                style={{ display: 'block' }}
-                data-ad-client="ca-pub-6822768824603153"
-                data-ad-slot="1234567890"
-                data-ad-format="auto"
-                data-full-width-responsive="true"></ins>
-            </div>
-            <button 
-              onClick={() => setShowAd(false)}
-              className="mt-1 text-xs text-gray-400 hover:text-gray-600"
-            >
-              Tutup iklan
-            </button>
-          </div>
-        </motion.div>
-      )}
-
       {/* Header */}
-  <div className={`${themeClasses.bgSecondary} ${themeClasses.border} p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm`}>
-        <div className="flex items-center space-x-3">
+      <div className={`${themeClasses.bgSecondary} ${themeClasses.border} p-3 flex items-center justify-between sticky top-0 z-10 shadow-sm`}>
+        <div className="flex items-center space-x-2">
           <button 
             onClick={() => setShowChatHistory(!showChatHistory)}
-            className={`p-2 rounded-full ${themeClasses.hoverBg} transition-colors`}
+            className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="Riwayat Percakapan"
           >
-            <FiMessageSquare size={18} className={themeClasses.textSecondary} />
+            <FiMessageSquare size={16} className={themeClasses.textSecondary} />
           </button>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-            <span className="text-white text-sm font-bold">AI</span>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
+            <span className="text-white text-xs font-bold">AI</span>
           </div>
           <div>
-            <h2 className="font-semibold text-base">Orion AI</h2>
+            <h2 className="font-semibold text-sm">Orion AI</h2>
             <p className="text-xs flex items-center">
               {isBotTyping ? (
                 <span className="flex items-center">
@@ -817,28 +973,46 @@ const ChatBot = () => {
                 </span>
               ) : (
                 <span className="flex items-center">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                  Online
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+                  Online {isProMode && <span className="ml-1 text-blue-400">(Mode Pro)</span>}
                 </span>
               )}
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1">
           <button 
             onClick={toggleDarkMode}
-            className={`p-2 rounded-full transition-colors ${themeClasses.hoverBg}`}
+            className={`p-1.5 rounded-full transition-colors ${themeClasses.hoverBg}`}
             title={darkMode ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
           >
-            {darkMode ? <FiSun size={18} className="text-yellow-300" /> : <FiMoon size={18} />}
+            {darkMode ? <FiSun size={16} className="text-yellow-300" /> : <FiMoon size={16} />}
           </button>
-          {/* Pro Mode and Memory buttons removed */}
+          <button 
+            onClick={toggleProMode}
+            className={`p-1.5 rounded-full transition-all ${
+              isProMode ? 'bg-blue-100 text-blue-600' : themeClasses.hoverBg
+            }`}
+            title={isProMode ? 'Matikan Mode Pro' : 'Aktifkan Mode Pro'}
+          >
+            <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
+          </button>
+          <motion.button
+            animate={controls}
+            onClick={() => setShowMemoryPanel(!showMemoryPanel)}
+            className={`p-1.5 rounded-full transition-colors ${
+              showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg
+            }`}
+            title="Memori"
+          >
+            <FiCpu size={16} />
+          </motion.button>
           <button
             onClick={createNewChatRoom}
-            className={`p-2 rounded-full ${themeClasses.hoverBg} transition-colors`}
+            className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="Percakapan Baru"
           >
-            <FiPlus size={18} />
+            <FiPlus size={16} />
           </button>
         </div>
       </div>
@@ -850,13 +1024,11 @@ const ChatBot = () => {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ type: "spring", damping: 25 }}
-          className={`absolute left-4 top-16 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
+          className={`absolute left-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-72`}
         >
           <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
-            <h4 className="font-medium text-sm flex items-center">
-              <FiMessageSquare className="mr-2" size={14} /> Riwayat Percakapan
-            </h4>
-              <button 
+            <h4 className="font-medium text-sm">Riwayat Percakapan</h4>
+            <button 
               onClick={() => setShowChatHistory(false)}
               className={`p-1 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary}`}
             >
@@ -869,28 +1041,18 @@ const ChatBot = () => {
               <div className="p-4 text-center text-sm">
                 Belum ada riwayat percakapan
               </div>
-              ) : (
+            ) : (
               <div className={`divide-y ${themeClasses.border}`}>
                 {chatRooms.map((room) => (
                   <div 
                     key={room.id} 
-                    className={`p-3 hover:${themeClasses.bgTertiary} transition-colors cursor-pointer group ${room.id === currentRoomId ? themeClasses.bgTertiary : ''}`}
+                    className={`p-3 hover:${themeClasses.bgTertiary} transition-colors cursor-pointer group ${room.id === currentRoomId ? `${themeClasses.bgTertiary}` : ''}`}
                     onClick={() => switchChatRoom(room.id)}
                   >
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="text-xs font-medium break-words pr-2">
-                          {room.name}
-                        </p>
-                        <p className="text-xs mt-1 text-gray-500">
-                          {new Date(room.createdAt).toLocaleString('id-ID')}
-                        </p>
-                        {room.messages.length > 0 && (
-                          <p className="text-xs mt-1 truncate">
-                            {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
-                          </p>
-                        )}
-                      </div>
+                      <p className="text-xs font-medium break-words pr-2">
+                        {room.name}
+                      </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -901,6 +1063,14 @@ const ChatBot = () => {
                         <FiTrash2 size={14} />
                       </button>
                     </div>
+                    <p className="text-xs mt-1">
+                      {new Date(room.createdAt).toLocaleString('id-ID')}
+                    </p>
+                    {room.messages.length > 0 && (
+                      <p className="text-xs mt-1 truncate">
+                        {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -920,15 +1090,15 @@ const ChatBot = () => {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, type: 'spring' }}
-              className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
+              className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
             >
-              <span className="text-3xl text-white">AI</span>
+              <span className="text-2xl text-white">AI</span>
             </motion.div>
             <motion.h3 
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.1, duration: 0.3 }}
-              className="text-2xl font-semibold text-center mb-2"
+              className="text-xl font-semibold text-center mb-1"
             >
               Halo, saya Orion 😊!
             </motion.h3>
@@ -936,12 +1106,53 @@ const ChatBot = () => {
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className="text-center mb-8 max-w-md text-sm"
+              className="text-center mb-6 max-w-md text-sm"
             >
               Asisten AI Anda dengan memori otomatis. Tanyakan apa saja atau unggah file untuk dianalisis.
             </motion.p>
             
-            {/* Template buttons removed */}
+            {showTemplateButtons && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3, staggerChildren: 0.1 }}
+                className="grid grid-cols-2 gap-3 w-full max-w-md"
+              >
+                {[
+                  { 
+                    title: "Sapa Orion", 
+                    desc: "Mulai percakapan",
+                    message: "Halo Orion! Apa kabar hari ini?" 
+                  },
+                  { 
+                    title: "Brainstorm ide", 
+                    desc: "Dapatkan saran kreatif",
+                    message: "Berikan beberapa ide kreatif untuk proyek saya tentang..." 
+                  },
+                  { 
+                    title: "Jelaskan sesuatu", 
+                    desc: "Dapatkan penjelasan jelas",
+                    message: "Jelaskan bagaimana machine learning bekerja dengan bahasa sederhana" 
+                  },
+                  { 
+                    title: "Bantuan koding", 
+                    desc: "Debug atau jelaskan kode",
+                    message: "Bantu saya debug kode ini..." 
+                  }
+                ].map((item, index) => (
+                  <motion.button
+                    key={index}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTemplateButtonClick(item.message)}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <p className="text-xs mt-1">{item.desc}</p>
+                  </motion.button>
+                ))}
+              </motion.div>
+            )}
           </div>
         )}
 
@@ -964,14 +1175,16 @@ const ChatBot = () => {
               >
                 <motion.div
                   whileHover={{ scale: 1.01 }}
-                  className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? `${themeClasses.cardBg} ${themeClasses.border}` : 'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-4 shadow-xs`}
+                  className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                    `${themeClasses.cardBg} ${themeClasses.border}` : 
+                    'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
                 >
                   {message.isBot && (
-                    <div className="flex items-center mb-2">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                        <span className="text-xs text-white">AI</span>
+                    <div className="flex items-center mb-1">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                        <span className="text-2xs text-white">AI</span>
                       </div>
-                      <span className="text-sm font-medium">Orion</span>
+                      <span className="text-xs font-medium">Orion</span>
                     </div>
                   )}
                   
@@ -999,9 +1212,9 @@ const ChatBot = () => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       transition={{ duration: 0.3 }}
-                      className={`mt-3 pt-3 border-t ${themeClasses.border}`}
+                      className={`mt-2 pt-2 border-t ${themeClasses.border}`}
                     >
-                      <p className="text-xs font-medium mb-2">Sumber:</p>
+                      <p className="text-xs font-medium mb-1">Sumber:</p>
                       <div className="space-y-2">
                         {message.sources.map((source, index) => (
                           <motion.div
@@ -1017,7 +1230,7 @@ const ChatBot = () => {
                             >
                               {source.title} <FiExternalLink className="ml-1" size={10} />
                             </a>
-                            <p className="text-xs opacity-80 mt-1">{source.content}</p>
+                            <p className="text-xs opacity-80 mt-0.5">{source.content}</p>
                             {source.source && (
                               <span className="text-xs text-gray-500">{source.source}</span>
                             )}
@@ -1027,7 +1240,7 @@ const ChatBot = () => {
                     </motion.div>
                   )}
                   
-                  <div className="flex items-center justify-between mt-2">
+                  <div className="flex items-center justify-between mt-1">
                     <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
                       {message.time}
                       {message.isBot && message.duration > 0 && (
@@ -1044,9 +1257,9 @@ const ChatBot = () => {
                             title="Salin ke clipboard"
                           >
                             {copiedMessageId === message.id ? (
-                              <FiCheck size={16} className="text-green-500" />
+                              <FiCheck size={14} className="text-green-500" />
                             ) : (
-                              <FiCopy size={16} />
+                              <FiCopy size={14} />
                             )}
                           </button>
                         </>
@@ -1064,16 +1277,16 @@ const ChatBot = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-4 max-w-[90%] md:max-w-[80%]`}
+              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-3 max-w-[90%] md:max-w-[80%]`}
             >
-              <div className="flex items-center mb-2">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                  <span className="text-xs text-white">AI</span>
+              <div className="flex items-center mb-1">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                  <span className="text-2xs text-white">AI</span>
                 </div>
-                <span className="text-sm font-medium">Memproses</span>
+                <span className="text-xs font-medium">Memproses</span>
               </div>
               
-              <div className="space-y-3 mt-3">
+              <div className="space-y-2 mt-2">
                 {processingSources.map((source) => (
                   <motion.div
                     key={source.id}
@@ -1095,17 +1308,17 @@ const ChatBot = () => {
                         repeat: Infinity,
                         ease: "easeInOut"
                       }}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
+                      className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
                     >
                       {source.completed ? (
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       ) : (
                         source.icon
                       )}
                     </motion.div>
-                    <span className="text-sm">{source.text}</span>
+                    <span className="text-xs">{source.text}</span>
                   </motion.div>
                 ))}
               </div>
@@ -1120,7 +1333,7 @@ const ChatBot = () => {
       {showScrollButton && (
         <motion.button
           onClick={scrollToBottomButton}
-          className={`fixed right-6 bottom-24 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
+          className={`fixed right-4 bottom-20 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
@@ -1132,10 +1345,136 @@ const ChatBot = () => {
         </motion.button>
       )}
 
-      {/* Memory panel removed */}
+      {/* Memory Panel */}
+      {showMemoryPanel && (
+        <motion.div 
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 20 }}
+          transition={{ type: "spring", damping: 25 }}
+          className={`absolute right-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
+        >
+          <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
+            <h4 className="font-medium text-sm flex items-center">
+              <FiCpu className="mr-2" size={14} /> Konteks Memori
+            </h4>
+            <div className="flex items-center space-x-2">
+              <div className="relative">
+                <select
+                  value={memoryImportanceFilter}
+                  onChange={(e) => setMemoryImportanceFilter(e.target.value)}
+                  className={`text-xs ${themeClasses.bgTertiary} hover:${themeClasses.bgSecondary} px-2 py-1 rounded-lg transition-colors appearance-none pr-6 ${themeClasses.textPrimary}`}
+                >
+                  <option value="all">Semua Memori</option>
+                  <option value="important">Penting</option>
+                  <option value="normal">Normal</option>
+                </select>
+                <FiChevronDown size={12} className="absolute right-2 top-2 pointer-events-none" />
+              </div>
+              <button 
+                onClick={autoSaveToMemory}
+                disabled={messages.length === 0}
+                className={`text-xs ${themeClasses.bgTertiary} hover:${themeClasses.bgSecondary} px-2 py-1 rounded-lg transition-colors disabled:opacity-50`}
+              >
+                Ingat
+              </button>
+              <button 
+                onClick={() => setShowMemoryPanel(false)}
+                className={`p-1 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary}`}
+              >
+                <FiX size={16} />
+              </button>
+            </div>
+          </div>
+          
+          <div className="max-h-72 overflow-y-auto scrollbar-thin text-sm">
+            {filteredMemories.length === 0 ? (
+              <div className="p-4 text-center text-sm">
+                Belum ada memori. Konteks penting akan muncul di sini.
+              </div>
+            ) : (
+              <div className={`divide-y ${themeClasses.border}`}>
+                {filteredMemories.map((memory) => (
+                  <div key={memory.id} className={`p-3 hover:${themeClasses.bgTertiary} transition-colors group`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-start">
+                          <p className="text-xs break-words pr-2">{memory.summary}</p>
+                          {memory.context.importance >= 4 && (
+                            <FiStar className="text-yellow-400 flex-shrink-0 mt-0.5" size={12} />
+                          )}
+                        </div>
+                        <p className="text-xs mt-1">{memory.context.date}</p>
+                        {memory.context.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {memory.context.tags.map(tag => (
+                              <span key={tag} className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => setShowMemoryDetails(showMemoryDetails === memory.id ? null : memory.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 text-xs transition-opacity"
+                          title="Detail"
+                        >
+                          <FiInfo size={14} />
+                        </button>
+                        <button
+                          onClick={() => deleteMemory(memory.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
+                          title="Hapus"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {showMemoryDetails === memory.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`mt-2 pt-2 border-t ${themeClasses.border}`}
+                      >
+                        <div className="flex items-center text-xs mb-1">
+                          <span className="font-medium mr-2">Detail:</span>
+                          <span className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                            {memory.context.language === 'indonesia' ? 'Bahasa Indonesia' : 'English'}
+                          </span>
+                          <span className="mx-2">•</span>
+                          <span className="flex items-center">
+                            <FiStar className="mr-1" size={12} />
+                            Penting: {memory.context.importance}/5
+                          </span>
+                        </div>
+                        <div className="text-xs max-h-40 overflow-y-auto bg-gray-900 bg-opacity-20 rounded p-2">
+                          {memory.messages.slice(0, 4).map((msg, idx) => (
+                            <p key={idx} className="mb-1">
+                              <span className="font-medium">{msg.isBot ? 'Orion' : 'Anda'}:</span> {msg.text.replace(/<[^>]*>?/gm, '').substring(0, 100)}...
+                            </p>
+                          ))}
+                          {memory.messages.length > 4 && (
+                            <p className="text-xs text-gray-500">+ {memory.messages.length - 4} pesan lainnya</p>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Bottom Input Container */}
-  <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-3 pb-4 px-4`}>
+      <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
         
         {/* File Preview */}
         <AnimatePresence>
@@ -1145,7 +1484,7 @@ const ChatBot = () => {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className={`flex items-center space-x-3 p-3 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+              className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
             >
               {pendingFiles.map((file, index) => (
                 <motion.div
@@ -1155,7 +1494,7 @@ const ChatBot = () => {
                   transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
                   className="relative flex-shrink-0"
                 >
-                  <div className={`w-16 h-16 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
+                  <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
                     {file.type.startsWith('image/') ? (
                       <img
                         src={URL.createObjectURL(file)}
@@ -1164,8 +1503,8 @@ const ChatBot = () => {
                       />
                     ) : (
                       <div className="p-1 text-center">
-                        <FiFile size={18} className="mx-auto" />
-                        <p className="text-xs mt-0.5 truncate w-14">{file.name.split('.')[0]}</p>
+                        <FiFile size={16} className="mx-auto" />
+                        <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
                       </div>
                     )}
                   </div>
@@ -1193,7 +1532,7 @@ const ChatBot = () => {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className={`text-xs px-3 py-1.5 mb-2 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
+            className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
           >
             <FiGlobe size={12} className="mr-1" />
             {searchMode === 'deep' ? 'Pencarian Web Mendalam' : 'Pencarian Web'} aktif
@@ -1223,14 +1562,14 @@ const ChatBot = () => {
               }
             }}
             placeholder="Ketik pesan Anda..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
             rows={1}
-            style={{ minHeight: '52px', maxHeight: '120px' }}
+            style={{ minHeight: '48px', maxHeight: '120px' }}
             whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
             transition={{ type: "spring", stiffness: 100 }}
           />
 
-          <div className="absolute right-3 bottom-3 flex items-center space-x-1.5">
+          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
             {inputMessage && (
               <motion.button
                 onClick={() => setInputMessage('')}
@@ -1270,7 +1609,7 @@ const ChatBot = () => {
               <>
                 <motion.button
                   onClick={() => setShowFileOptions(!showFileOptions)}
-                  className={`p-1.5 rounded-full transition-all ${showFileOptions ? themeClasses.bgTertiary : themeClasses.hoverBg}`}
+                  className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
                   title="Lampirkan file"
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
@@ -1308,7 +1647,7 @@ const ChatBot = () => {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
-              className="flex space-x-3 pt-3"
+              className="flex space-x-2 pt-2"
             >
               <motion.label
                 className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
@@ -1344,35 +1683,6 @@ const ChatBot = () => {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Ad Banner (Bottom) - Only shown after 10 minutes */}
-      {adTimer >= 600 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 50 }}
-          transition={{ duration: 0.3 }}
-          className={`w-full ${themeClasses.bgSecondary} ${themeClasses.border} p-2 flex justify-center items-center sticky bottom-0 z-50`}
-        >
-          <div className="text-center text-xs">
-            <p className="mb-1">Dukung pengembangan dengan menonaktifkan AdBlock</p>
-            <div className="w-full max-w-2xl mx-auto">
-              <ins className="adsbygoogle"
-                style={{ display: 'block' }}
-                data-ad-client="ca-pub-6822768824603153"
-                data-ad-slot="0987654321"
-                data-ad-format="auto"
-                data-full-width-responsive="true"></ins>
-            </div>
-            <button 
-              onClick={() => setAdTimer(0)}
-              className="mt-1 text-xs text-gray-400 hover:text-gray-600"
-            >
-              Tutup iklan
-            </button>
-          </div>
-        </motion.div>
-      )}
 
       {/* Prism.js for syntax highlighting */}
       <link 
@@ -1639,9 +1949,11 @@ const ChatBot = () => {
           font-style: italic;
           transition: border-color 0.3s ease;
         }
+
         .prose blockquote:hover {
           border-left-color: ${darkMode ? '#64748b' : '#94a3b8'};
         }
+
         .prose hr {
           border: none;
           border-top: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
