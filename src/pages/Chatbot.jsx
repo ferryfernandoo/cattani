@@ -190,7 +190,6 @@ const ChatBot = () => {
   // Fallback helper: send prompt to a server-side proxy endpoint (/api/generate)
   // The server should accept { prompt } and return a plain text response.
   const sendToServerProxy = async (prompt, signal) => {
-    console.log('sendToServerProxy: calling /api/generate with prompt length', prompt?.length);
     const resp = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -198,50 +197,35 @@ const ChatBot = () => {
       signal
     });
 
-    const text = await resp.text().catch(() => null);
     if (!resp.ok) {
-      console.error('sendToServerProxy: non-ok response', resp.status, text);
+      const text = await resp.text().catch(() => null);
       throw new Error(`Proxy error ${resp.status}: ${text || resp.statusText}`);
     }
-    console.log('sendToServerProxy: success, response length', text?.length);
-    return text;
+
+    return await resp.text();
   };
 
   // Unified model caller: try SDK first, fall back to server proxy.
   const callModel = async (prompt, signal) => {
     try {
-      console.log('callModel: attempting SDK generateContent');
       // Try SDK path first (may fail in browser due to CORS or server-only SDK)
       const sdkResult = await model.generateContent(prompt);
-      console.log('callModel: SDK response received', sdkResult);
       // Many SDK responses expose a response.text() helper
       if (sdkResult?.response && typeof sdkResult.response.text === 'function') {
         const t = await sdkResult.response.text();
-        if (t) {
-          console.log('callModel: SDK returned text length', t.length);
-          return t;
-        }
+        if (t) return t;
       }
 
       // Some SDK shapes include output/content arrays
       if (sdkResult?.output && Array.isArray(sdkResult.output)) {
         const out = sdkResult.output.map(o => (o.content || []).map(c => c.text || '').join('')).join('\n');
-        if (out) {
-          console.log('callModel: SDK output array parsed length', out.length);
-          return out;
-        }
+        if (out) return out;
       }
 
       // Fallback to stringifying whatever we got
-      if (sdkResult != null) {
-        console.log('callModel: SDK returned non-text result, stringifying');
-        return String(sdkResult || '');
-      }
-      // If SDK returned nothing usable, fall back
-      console.warn('callModel: SDK returned no usable content, falling back to proxy');
-      return await sendToServerProxy(prompt, signal);
+      return String(sdkResult || '');
     } catch (sdkErr) {
-      console.error('callModel: SDK generateContent failed, will attempt server proxy', sdkErr);
+      console.warn('SDK generateContent failed, using server proxy fallback', sdkErr);
       // Fallback: call local server proxy at /api/generate (implement server separately)
       return await sendToServerProxy(prompt, signal);
     }
@@ -353,10 +337,10 @@ const ChatBot = () => {
     if (replyQuote) setReplyQuote(null);
 
     } catch (error) {
-      const errorMessage = error?.name === 'AbortError' 
+      const errorMessage = error.name === 'AbortError' 
         ? 'Respon dihentikan oleh pengguna'
-        : `Waduh, ada yang salah nih sama Orion! Gak konek ke servernya... (${error?.message || 'unknown'})`;
-      console.error('handleSendMessage error:', error);
+        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
+      
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
