@@ -205,6 +205,32 @@ const ChatBot = () => {
     return await resp.text();
   };
 
+  // Unified model caller: try SDK first, fall back to server proxy.
+  const callModel = async (prompt, signal) => {
+    try {
+      // Try SDK path first (may fail in browser due to CORS or server-only SDK)
+      const sdkResult = await model.generateContent(prompt);
+      // Many SDK responses expose a response.text() helper
+      if (sdkResult?.response && typeof sdkResult.response.text === 'function') {
+        const t = await sdkResult.response.text();
+        if (t) return t;
+      }
+
+      // Some SDK shapes include output/content arrays
+      if (sdkResult?.output && Array.isArray(sdkResult.output)) {
+        const out = sdkResult.output.map(o => (o.content || []).map(c => c.text || '').join('')).join('\n');
+        if (out) return out;
+      }
+
+      // Fallback to stringifying whatever we got
+      return String(sdkResult || '');
+    } catch (sdkErr) {
+      console.warn('SDK generateContent failed, using server proxy fallback', sdkErr);
+      // Fallback: call local server proxy at /api/generate (implement server separately)
+      return await sendToServerProxy(prompt, signal);
+    }
+  };
+
 
 
   // Web research removed for efficiency
@@ -277,23 +303,8 @@ const ChatBot = () => {
         `Fokus hanya pada kutipan berikut dan jawab berdasar itu:\n"${quoted}"\n\nPercakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. For coding, provide complete solutions with proper formatting.`
         : `Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. For coding, provide complete solutions with proper formatting. Always maintain context.`;
 
-      const result = await model.generateContent(fullPrompt);
-          let botResponse;
-          try {
-            // SDK path (may fail in browser if SDK is server-only or due to CORS/auth)
-            const sdkResult = await model.generateContent(fullPrompt);
-            botResponse = await sdkResult.response.text();
-          } catch (sdkErr) {
-            console.error('SDK generateContent failed, attempting server proxy fallback:', sdkErr);
-            // Fallback: call local server proxy at /api/generate (implement server separately)
-            try {
-              const proxyResp = await sendToServerProxy(fullPrompt, controller.signal);
-              botResponse = proxyResp;
-            } catch (proxyErr) {
-              console.error('Server proxy call failed:', proxyErr);
-              throw sdkErr; // rethrow original to be handled by outer catch
-            }
-          }
+      // Unified call: try SDK then fallback to proxy
+      const botResponse = await callModel(fullPrompt, controller.signal);
 
   const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
@@ -474,8 +485,7 @@ const ChatBot = () => {
       setIsBotTyping(true);
       const controller = new AbortController();
       setAbortController(controller);
-      const result = await model.generateContent(prompt);
-      const botResponse = await result.response.text();
+      const botResponse = await callModel(prompt, controller.signal);
       const processed = processSpecialChars(botResponse);
       setMessages(prev => prev.map(m => m.id === message.id ? { ...m, text: processed } : m));
     } catch (e) {
