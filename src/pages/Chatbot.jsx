@@ -187,6 +187,24 @@ const ChatBot = () => {
     callback(fullText);
   };
 
+  // Fallback helper: send prompt to a server-side proxy endpoint (/api/generate)
+  // The server should accept { prompt } and return a plain text response.
+  const sendToServerProxy = async (prompt, signal) => {
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+      signal
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => null);
+      throw new Error(`Proxy error ${resp.status}: ${text || resp.statusText}`);
+    }
+
+    return await resp.text();
+  };
+
 
 
   // Web research removed for efficiency
@@ -260,7 +278,22 @@ const ChatBot = () => {
         : `Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. For coding, provide complete solutions with proper formatting. Always maintain context.`;
 
       const result = await model.generateContent(fullPrompt);
-      const botResponse = await result.response.text();
+          let botResponse;
+          try {
+            // SDK path (may fail in browser if SDK is server-only or due to CORS/auth)
+            const sdkResult = await model.generateContent(fullPrompt);
+            botResponse = await sdkResult.response.text();
+          } catch (sdkErr) {
+            console.error('SDK generateContent failed, attempting server proxy fallback:', sdkErr);
+            // Fallback: call local server proxy at /api/generate (implement server separately)
+            try {
+              const proxyResp = await sendToServerProxy(fullPrompt, controller.signal);
+              botResponse = proxyResp;
+            } catch (proxyErr) {
+              console.error('Server proxy call failed:', proxyErr);
+              throw sdkErr; // rethrow original to be handled by outer catch
+            }
+          }
 
   const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
