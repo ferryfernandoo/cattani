@@ -52,7 +52,7 @@ const ChatBot = () => {
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+ const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   // Ads removed
 
